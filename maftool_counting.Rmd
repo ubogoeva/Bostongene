@@ -1,0 +1,90 @@
+---
+title: "maftools_oncodrive"
+author: "Elena U"
+date: '29 марта 2019 г '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## An algorithm to visualize maf file, identify driver genes by using OncodriveCLUST 
+Loading data
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+Note that you have R version 3.5 and later and loaded required package maftools
+```{r transform data to require input}
+maf_file <- read.csv('~/GitHub/Bostongene/genes_sign_mutsig.csv', header = T)
+colnames(maf_file)[c(2, 3, 6, 8, 13, 17)] <- c('Hugo_Symbol', 'Tumor_Sample_Barcode', 'Variant_Classification', 'Protein_Change', 'Chromosome', 'Tumor_Seq_Allele2')
+#rename our columns to require
+maf_file$Variant_Type <- NA #create new column
+maf_file[grep('Del', maf_file$Variant_Classification, 
+                           ignore.case = T), 23] <- 'DEL'
+maf_file[grep('Ins', maf_file$Variant_Classification, 
+              ignore.case = T), 23] <- 'INS'
+maf_file[is.na(maf_file$Variant_Type), 23] <- 'SNP'
+write.table(maf_file, file = '~/GitHub/Bostongene/genes_sign_mutsig.tsv', 
+            sep = '\t', quote = F, row.names = F)
+#input variant type of mutation
+
+```
+```{r read maf}
+library(maftools)
+laml <- read.maf(maf = '~/GitHub/Bostongene/genes_sign_mutsig.tsv')
+getSampleSummary(laml)
+#write.mafSummary(maf = laml, basename = 'head_and_neck')
+
+```
+## Visualization
+
+```{r visualizing}
+plotmafSummary(maf = laml, rmOutlier = TRUE, addStat = 'median', 
+               dashboard = TRUE, titvRaw = FALSE)
+
+```
+It's summary of mutated genes
+```{r, echo=F}
+#function oncoplot work for long time 
+oncoplot(maf = laml, top = 10, fontSize = 12, removeNonMutated = TRUE)
+```
+
+#
+```{r, echo=F}
+#print lollipop plot for FAT1 gene
+lollipopPlot(maf = laml, gene = 'FAT1', AACol = 'Protein_Change', showMutationRate = TRUE,
+                           domainLabelSize = 2.5)
+```
+
+```{r gene cloud}
+geneCloud(input = laml, minMut = 3)
+```
+
+
+## Analysis
+
+```{r oncodriveCLUST, echo=F}
+laml.sig = oncodrive(maf = laml, AACol = 'Protein_Change', minMut = 5, pvalMethod = 'zscore')
+head(laml.sig)
+plotOncodrive(res = laml.sig, fdrCutOff = 0.1, useFraction = TRUE)
+
+```
+
+```{r}
+laml.sig[laml.sig$fdr < 0.1, ]
+#we have 13 significant driver genes 
+```
+
+```{r}
+laml.pfam = pfamDomains(maf = laml, AACol = 'Protein_Change', top = 10)
+somaticInteractions(maf = laml, top = 25, pvalue = c(0.05, 0.1))
+```
+
+
+# Results
+
+OncodriveCLUST identify 13 significant driver genes
+
+
